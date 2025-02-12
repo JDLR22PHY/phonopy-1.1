@@ -115,6 +115,64 @@ class Dos:
         else:
             self._smearing_function = NormalDistribution(self._sigma)
 
+    def integrate_states_in_frequency_range(self, freq_min, freq_max, states, temperature):
+        """Integrate the given states over a specified frequency range,
+        multiplying by the Bose-Einstein distribution.
+
+        Parameters
+        ----------
+        freq_min : float
+            The lower bound of the frequency range.
+        freq_max : float
+            The upper bound of the frequency range.
+        states : ndarray
+            The phonon states to integrate, must be an array of the same length
+            as self.frequency_points or compatible shape.
+        temperature : float
+            Temperature in Kelvin.
+
+        Returns
+        -------
+        integral : float or ndarray
+            The integral of the states over the specified frequency range.
+            If states is multidimensional, the integration is performed over
+            the frequency axis.
+
+        """
+        # Ensure that frequency points and states have compatible shapes
+        if states.shape[-1] != len(self._frequency_points):
+            raise ValueError("The last dimension of states must match the length of frequency_points.")
+
+        # Create a boolean mask for the frequency range
+        freq_mask = (self._frequency_points >= freq_min) & (self._frequency_points <= freq_max)
+
+        # Select the frequencies and states within the specified range
+        freq_subset = self._frequency_points[freq_mask]
+        states_subset = states[..., freq_mask]
+
+        # Constants for unit conversions and Boltzmann constant
+        KB = 8.617330337217213e-05  # Boltzmann constant in eV/K
+        THZ_TO_EV = 0.00413566733   # Conversion factor from THz to eV
+
+        # Calculate the Bose-Einstein distribution for the frequencies
+        if np.isclose(temperature, 0.0):
+            # At zero temperature, the Bose-Einstein distribution is zero
+            bose_einstein = np.zeros_like(freq_subset)
+        else:
+            exponent = freq_subset * THZ_TO_EV / (KB * temperature)
+            # To prevent overflow in exp(), cap the exponent to a reasonable value
+            exponent = np.clip(exponent, None, 700)
+            bose_einstein = 1.0 / (np.exp(exponent) - 1.0)
+
+        # Multiply states by the Bose-Einstein distribution
+        #weighted_states = states_subset * bose_einstein
+        weighted_states = states_subset * 1
+        
+        # Perform the integration using the trapezoidal rule over the frequency axis
+        integral = np.trapz(weighted_states, freq_subset, axis=-1)
+
+        return integral
+
     def set_sigma(self, sigma):
         """Set sigma."""
         self._sigma = sigma
@@ -138,7 +196,7 @@ class Dos:
             f_max = freq_max
 
         if freq_pitch is None:
-            f_delta = (f_max - f_min) / 200.0
+            f_delta = (f_max - f_min) / 600.0
         else:
             f_delta = freq_pitch
         self._frequency_points = np.arange(f_min, f_max + f_delta * 0.1, f_delta)
@@ -147,7 +205,8 @@ class Dos:
 class TotalDos(Dos):
     """Class to calculate total DOS."""
 
-    def __init__(self, mesh_object: Mesh, sigma=None, use_tetrahedron_method=False):
+    def __init__(self, mesh_object: Mesh, sigma=None, use_tetrahedron_method=False, 
+                 freq_min=None, freq_max=None, temperature=0.1):
         """Init method."""
         super().__init__(
             mesh_object,
@@ -159,13 +218,20 @@ class TotalDos(Dos):
         self._Debye_fit_coef = None
         self._openmp_thm = True
 
+        self.freq_min = freq_min
+        self.freq_max = freq_max
+        self.temperature = temperature
+        self.integrated_dos = None  # To store the result of integration
+
     def run(self):
         """Calculate total DOS."""
         if self._tetrahedron_mesh is None:
+            print("Smearing")
             self._dos = np.array(
                 [self._get_density_of_states_at_freq(f) for f in self._frequency_points]
             )
         else:
+            print("Tetra")
             if self._openmp_thm:
                 self._run_tetrahedron_method_dos()
             else:
@@ -174,6 +240,18 @@ class TotalDos(Dos):
                 thm.set(value="I", frequency_points=self._frequency_points)
                 for i, iw in enumerate(thm):
                     self._dos += np.sum(iw * self._weights[i], axis=1)
+        if self.freq_min is None:
+            self.freq_min = 0.1
+        if self.freq_max is None:
+            self.freq_max = 15
+        # Perform integration over frequency range with Bose-Einstein distribution
+        if self.freq_min is not None and self.freq_max is not None:
+            self.integrated_dos = self.integrate_states_in_frequency_range(
+                self.freq_min, self.freq_max, self._dos, self.temperature
+            )
+            print(
+                f"Integrated DOS from {self.freq_min} to {self.freq_max} THz at {self.temperature} K: {self.integrated_dos}"
+            )
 
     @property
     def dos(self):
@@ -683,6 +761,328 @@ def plot_projected_dos(
 
     ax.grid(draw_grid)
 
+# --------------------- New Additions for PAM Integration ---------------------
+
+def phonon_angular_momentum(freq: np.ndarray, polar_vec: np.ndarray, temp: float = 0.0) -> np.ndarray:
+    """Calculate phonon angular momentum (in units of ℏ).
+    
+    Parameters
+    ----------
+    freq : np.ndarray
+        Phonon frequencies in THz; shape=(nqpts, nbnds).
+    polar_vec : np.ndarray
+        Complex eigenvectors; shape=(nqpts, nbnds, 3*num_atoms).
+    temp : float, optional
+        Temperature in Kelvin (default: 0.0).
+    
+    Returns
+    -------
+    np.ndarray
+        Angular momentum components; shape=(3, nqpts, nbnds).
+    """
+    KB = 8.617330337217213e-05  # eV/K
+    THZ_TO_EV = 0.00413566733   # Conversion factor from THz to eV
+
+    if np.isclose(temp, 0.0):
+        nbose = 0.5
+    else:
+        nbose = 0.5 + 1.0 / (np.exp(freq * THZ_TO_EV / (KB * temp)) - 1.0)
+
+    # Determine the number of atoms from the eigenvector shape
+    num_atoms = polar_vec.shape[2] // 3
+    if polar_vec.shape[2] != 3 * num_atoms:
+        raise ValueError(f"Eigenvectors third dimension size {polar_vec.shape[2]} is not divisible by 3.")
+
+    # Reshape to separate atomic and Cartesian components
+    # Shape becomes (nqpts, nbnds, num_atoms, 3)
+    E = polar_vec.reshape(polar_vec.shape[0], polar_vec.shape[1], num_atoms, 3)
+
+    # Define the component pairs for angular momentum calculation (Jx, Jy, Jz)
+    ixyz = [[1, 2], [2, 0], [0, 1]]  # For Jx, Jy, Jz respectively
+
+    # Initialize Jxyz array
+    Jxyz = np.zeros((3, freq.shape[0], freq.shape[1]), dtype=np.float64)
+
+    for ii in range(3):
+        e1 = E[:, :, :, ixyz[ii][0]]  # e_y or e_z for Jx, etc., shape=(nqpts, nbnds, num_atoms)
+        e2 = E[:, :, :, ixyz[ii][1]]  # e_z or e_x for Jx, etc., shape=(nqpts, nbnds, num_atoms)
+        # Compute angular momentum: 2 * sum_over_atoms(Im(e1 * conj(e2)))
+        Jxyz[ii] = 2.0 * np.sum((e1.conj() * e2).imag, axis=2)  # shape=(nqpts, nbnds)
+
+    return Jxyz * nbose  # shape=(3, nqpts, nbnds)
+
+
+class PAMDos(Dos):
+    """Class to calculate phonon DOS separated by positive and negative PAM for each axis."""
+
+    def __init__(
+        self, mesh_object: Mesh, sigma=None, use_tetrahedron_method=False, temperature=0.0, threshold=0, 
+        freq_min=None,
+        freq_max=None,
+    ):
+        """Initialize PAMDos."""
+        super().__init__(
+            mesh_object, sigma=sigma, use_tetrahedron_method=use_tetrahedron_method
+        )
+        self.temperature = temperature
+        self.threshold = threshold
+        self.Jxyz = None  # To store PAM
+        self.dos_positive = None  # shape (3, frequency_points)
+        self.dos_negative = None  # shape (3, frequency_points)
+        self.axis_labels = ["x", "y", "z"]
+        self._openmp_thm = True
+
+
+        self.freq_min = freq_min
+        self.freq_max = freq_max
+        self.integrated_positive_dos = None  # To store integrated positive PAM DOS
+        self.integrated_negative_dos = None  # To store integrated negative PAM DOS
+
+    def run(self):
+        """Calculate PAM-resolved DOS."""
+        # Calculate PAM
+        self.Jxyz = phonon_angular_momentum(
+            self._frequencies, self._mesh_object.eigenvectors, self.temperature
+        )  # shape=(3, n_ir_grid_points, num_band)
+
+        if self._tetrahedron_mesh is None:
+            # Use smearing method
+            self._run_smearing_method()
+        else:
+            # Use tetrahedron method
+            self._run_tetrahedron_method_dos()
+
+        if self.freq_min is None:
+            self.freq_min = 0
+        if self.freq_max is None:
+            self.freq_max = self._frequency_points.max()
+        # Perform integration over frequency range with Bose-Einstein distribution
+        if self.freq_min is not None and self.freq_max is not None:
+            self.integrated_positive_dos = self.integrate_states_in_frequency_range(
+                self.freq_min, self.freq_max, self.dos_positive, self.temperature
+            )
+            self.integrated_negative_dos = self.integrate_states_in_frequency_range(
+                self.freq_min, self.freq_max, self.dos_negative, self.temperature
+            )
+            print(
+                f"Integrated Positive PAM DOS from {self.freq_min} to {self.freq_max} THz at {self.temperature} K:"
+            )
+            print(self.integrated_positive_dos)
+            print(
+                f"Integrated Negative PAM DOS from {self.freq_min} to {self.freq_max} THz at {self.temperature} K:"
+            )
+            print(self.integrated_negative_dos)
+            print(
+                f"Difference between Integrated Positive and Negative PAM DOS from {self.freq_min} to {self.freq_max} THz at {self.temperature} K:"
+            )
+            print(self.integrated_positive_dos-self.integrated_negative_dos)
+
+    def _run_smearing_method(self):
+        """Calculate PAM-resolved DOS using the smearing method."""
+        # Initialize DOS arrays for positive and negative PAM per axis
+        num_axes = 3
+        self.dos_positive = np.zeros(
+            (num_axes, len(self._frequency_points)), dtype="double"
+        )
+        self.dos_negative = np.zeros(
+            (num_axes, len(self._frequency_points)), dtype="double"
+        )
+
+        # Expand weights to shape (nqpts, 1) for broadcasting
+        expanded_weights = self._weights[:, np.newaxis]  # shape=(nqpts, 1)
+
+        # Broadcast weights to shape (nqpts, nbnds)
+        broadcast_weights = np.repeat(
+            expanded_weights, self._frequencies.shape[1], axis=1
+        )  # shape=(nqpts, nbnds)
+
+        # For each axis, separate phonon modes by PAM sign and calculate DOS
+        for axis in range(num_axes):
+            # Positive PAM
+            positive_mask = self.Jxyz[axis] > self.threshold  # shape=(nqpts, nbnds)
+            positive_freqs = self._frequencies[positive_mask]  # shape=(num_positive,)
+            positive_weights = broadcast_weights[positive_mask]  # shape=(num_positive,)
+            self.dos_positive[axis] = self._calculate_dos(
+                positive_freqs, positive_weights
+            )
+
+            # Negative PAM
+            negative_mask = self.Jxyz[axis] < -self.threshold  # shape=(nqpts, nbnds)
+            negative_freqs = self._frequencies[negative_mask]  # shape=(num_negative,)
+            negative_weights = broadcast_weights[negative_mask]  # shape=(num_negative,)
+            self.dos_negative[axis] = self._calculate_dos(
+                negative_freqs, negative_weights
+            )
+
+    def _run_tetrahedron_method_dos(self):
+        """Calculate PAM-resolved DOS using the tetrahedron method."""
+        mesh_numbers = self._mesh_object.mesh_numbers
+        cell = self._mesh_object.dynamical_matrix.primitive
+        reciprocal_lattice = np.linalg.inv(cell.cell)
+        tm = TetrahedronMethod(reciprocal_lattice, mesh=mesh_numbers)
+
+        # Initialize DOS arrays
+        num_axes = 3
+        self.dos_positive = np.zeros(
+            (num_axes, len(self._frequency_points)), dtype="double"
+        )
+        self.dos_negative = np.zeros(
+            (num_axes, len(self._frequency_points)), dtype="double"
+        )
+
+        num_grid_points = self._frequencies.shape[0]
+        num_bands = self._frequencies.shape[1]
+
+        for axis in range(num_axes):
+            # Positive PAM
+            positive_mask = (self.Jxyz[axis] > self.threshold).astype(
+                "double"
+            )  # shape=(n_ir_grid_points, num_band)
+            coef_positive = positive_mask.reshape(num_grid_points, 1, num_bands)
+
+            # Negative PAM
+            negative_mask = (self.Jxyz[axis] < -self.threshold).astype(
+                "double"
+            )  # shape=(n_ir_grid_points, num_band)
+            coef_negative = negative_mask.reshape(num_grid_points, 1, num_bands)
+
+            # Calculate DOS for positive PAM modes
+            dos_pos = run_tetrahedron_method_dos(
+                mesh_numbers,
+                self._frequency_points,
+                self._frequencies,
+                self._mesh_object.grid_address,
+                self._mesh_object.grid_mapping_table,
+                tm.tetrahedra,
+                coef=coef_positive,
+            )
+            # dos_pos has shape (len(frequency_points), num_pdos)
+            self.dos_positive[axis] = dos_pos[:, 0]
+
+            # Calculate DOS for negative PAM modes
+            dos_neg = run_tetrahedron_method_dos(
+                mesh_numbers,
+                self._frequency_points,
+                self._frequencies,
+                self._mesh_object.grid_address,
+                self._mesh_object.grid_mapping_table,
+                tm.tetrahedra,
+                coef=coef_negative,
+            )
+            self.dos_negative[axis] = dos_neg[:, 0]
+
+    def _calculate_dos(self, freqs_subset, weights_subset):
+        """Calculate DOS for a subset of frequencies and weights using the smearing function."""
+        # Vectorized calculation using broadcasting
+        delta = self._frequency_points[:, np.newaxis] - freqs_subset[np.newaxis, :]
+        dos = np.sum(weights_subset * self._smearing_function.calc(delta), axis=1)
+        dos /= np.sum(self._weights)
+        return dos
+
+    def get_pam_dos(self):
+        """Return frequency points and PAM-resolved DOS.
+
+        Returns
+        -------
+        tuple
+            (frequency_points, dos_positive, dos_negative)
+            Each dos_positive and dos_negative has shape (3, frequency_points)
+        """
+        return self._frequency_points, self.dos_positive, self.dos_negative
+
+    def plot_pam_dos(self, axes=None, figsize=(12, 9), xlabel="Frequency (THz)", ylabel="Density of States (DOS)", draw_grid=True):
+        """
+        Plot PAM-resolved DOS with three subplots, one for each PAM component.
+        Positive and negative PAM DOS are plotted on opposite sides of the y-axis.
+        
+        Parameters
+        ----------
+        figsize : tuple, optional
+            Size of the figure in inches (width, height).
+        xlabel : str, optional
+            Label for the x-axis.
+        ylabel : str, optional
+            Label for the y-axis.
+        draw_grid : bool, optional
+            Whether to draw grid lines on the plots.
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        # Define labels and colors for each PAM component
+        pam_labels = ['Jx', 'Jy', 'Jz']
+        colors = ['r', 'g', 'b']  # Red for x, Green for y, Blue for z
+        
+        # Determine the maximum absolute DOS value for consistent y-axis limits
+        max_dos = max(
+            np.max(self.dos_positive),
+            np.max(self.dos_negative)
+        )
+        if axes is None:
+            # Create a figure with 3 vertically stacked subplots
+            fig, axes = plt.subplots(3, 1, figsize=figsize, sharex=True)
+        
+        for i, ax in enumerate(axes):
+            # Plot positive PAM DOS
+            ax.plot(
+                self._frequency_points,
+                self.dos_positive[i],
+                color=colors[i],
+                linestyle='-',
+                label=f'{pam_labels[i]} PAM > 0'
+            )
+            
+            # Plot negative PAM DOS (mirrored below the x-axis)
+            ax.plot(
+                self._frequency_points,
+                -self.dos_negative[i],
+                color=colors[i],
+                linestyle='--',
+                label=f'{pam_labels[i]} PAM < 0'
+            )
+            
+            # Set subplot title
+            ax.set_title(f'Phonon DOS with {pam_labels[i]} Angular Momentum')
+            
+            # Set y-axis label
+            ax.set_ylabel(ylabel)
+            
+            # Set y-axis limits for symmetry
+            ax.set_ylim(-max_dos * 1.1, max_dos * 1.1)
+            
+            # Add legend
+            ax.legend(loc='upper right')
+            
+            # Add grid if requested
+            if draw_grid:
+                ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.7)
+        
+        # Set common x-axis label
+        axes[-1].set_xlabel(xlabel)
+    def write_pam_dos(self, filename="pam_dos.dat"):
+        """
+        Write PAM-resolved DOS to a file.
+
+        The file has columns:
+        Frequency, Jx+, Jx-, Jy+, Jy-, Jz+, Jz-
+
+        Parameters
+        ----------
+        filename : str
+            Output filename.
+        """
+        with open(filename, "w") as fp:
+            fp.write("# Frequency\tJx+\tJx-\tJy+\tJy-\tJz+\tJz-\n")
+            for i, freq in enumerate(self._frequency_points):
+                line = f"{freq:.10f}"
+                for axis in range(3):
+                    line += f"\t{self.dos_positive[axis][i]:.10f}\t{self.dos_negative[axis][i]:.10f}"
+                line += "\n"
+                fp.write(line)
+
+
+# --------------------- End of PAM Integration Additions ---------------------
+
 
 def run_tetrahedron_method_dos(
     mesh,
@@ -745,3 +1145,4 @@ def get_dos_frequency_range(freqs, dos):
     f_max += (f_max - f_min) * 0.05
 
     return f_min, f_max
+

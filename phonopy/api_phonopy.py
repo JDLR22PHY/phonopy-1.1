@@ -76,7 +76,7 @@ from phonopy.interface.pypolymlp import (
 )
 from phonopy.phonon.animation import write_animation
 from phonopy.phonon.band_structure import BandStructure, get_band_qpoints_by_seekpath
-from phonopy.phonon.dos import ProjectedDos, TotalDos, get_dos_frequency_range
+from phonopy.phonon.dos import ProjectedDos, TotalDos, PAMDos, get_dos_frequency_range
 from phonopy.phonon.group_velocity import GroupVelocity
 from phonopy.phonon.irreps import IrReps
 from phonopy.phonon.mesh import IterMesh, Mesh
@@ -147,7 +147,7 @@ class Phonopy:
     irreps : IrReps
     moment : PhononMoment
     total_dos : TotalDos
-
+    pam_dos : PAMDos
     """
 
     def __init__(
@@ -945,6 +945,13 @@ class Phonopy:
     def total_dos(self) -> TotalDos:
         """Return TotalDos instance."""
         return self._total_dos
+
+    @property
+    def pam_dos(self) -> PAMDos:
+        """Return PAMDos instance for phonon angular momentum DOS."""
+        if not hasattr(self, "_pam_dos"):
+            raise RuntimeError("PAM DOS has not been run. Call run_pam_dos() first.")
+        return self._pam_dos
 
     @property
     def partial_dos(self):
@@ -2294,6 +2301,72 @@ class Phonopy:
         total_dos.set_draw_area(freq_min, freq_max, freq_pitch)
         total_dos.run()
         self._total_dos = total_dos
+
+    def run_pam_dos(
+        self,
+        sigma=None,
+        freq_min=None,
+        freq_max=None,
+        freq_pitch=None,
+        use_tetrahedron_method=True,
+    ) -> None:
+        """Calculate the phonon angular momentum–resolved DOS.
+        
+        Parameters
+        ----------
+        sigma : float, optional
+            Smearing width (default: None).
+        freq_min, freq_max, freq_pitch : float, optional
+            Frequency range and sampling pitch.
+        use_tetrahedron_method : bool, optional
+            Use tetrahedron method when sigma is None.
+        """
+        if self._mesh is None:
+            msg = "run_mesh has to be done before DOS calculation."
+            raise RuntimeError(msg)
+
+        pam_dos = PAMDos(
+            self._mesh, sigma=sigma, use_tetrahedron_method=use_tetrahedron_method
+        )
+        pam_dos.set_draw_area(freq_min, freq_max, freq_pitch)
+        pam_dos.run()
+        self._pam_dos = pam_dos
+
+    def plot_pam_dos(
+        self, xlabel=None, ylabel=None, with_tight_frequency_range=False
+    ):
+        """Plot total DOS.
+
+        xlabel : str, optional
+            x-label of plot. Default is None, which puts a default x-label.
+        ylabel : str, optional
+            y-label of plot. Default is None, which puts a default y-label.
+        with_tight_frequency_range : bool, optional
+            Plot with tight frequency range. Default is False.
+
+        """
+        if self._pam_dos is None:
+            msg = "run_pam_dos has to be done before plotting " "total DOS."
+            raise RuntimeError(msg)
+
+        import matplotlib.pyplot as plt
+
+        fig, axes = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
+        self._pam_dos.plot_pam_dos(axes, xlabel=xlabel, ylabel=ylabel, draw_grid=True)
+        if with_tight_frequency_range:
+            fmin, fmax = get_dos_frequency_range(
+                self._pam_dos.frequency_points, self._pam_dos.dos
+            )
+            axes.set_xlim(fmin, fmax)
+	# Adjust layout for better spacing
+        plt.tight_layout()
+
+        return plt
+
+    def write_pam_dos(self, filename="pam_dos.dat") -> None:
+        """Write PAM projected DOS to text file."""
+        self._pam_dos.write_pam_dos(filename=filename)
+
 
     def set_total_DOS(
         self,

@@ -1345,6 +1345,33 @@ def _run_calculation(phonon: Phonopy, settings, plot_conf, log_level):
                         plot.savefig("partial_dos.pdf")
                     else:
                         plot.show()
+        
+        #
+        # DOS based on PAM
+        #
+        elif settings.ldos and run_mode in ("mesh", "band_mesh"):
+            # Run the PAM DOS calculation:
+            phonon.run_pam_dos(
+                sigma=settings.sigma,
+                freq_min=settings.min_frequency,
+                freq_max=settings.max_frequency,
+                freq_pitch=settings.frequency_pitch,
+                use_tetrahedron_method=settings.is_tetrahedron_method,
+            )
+            if log_level:
+                print("Calculating PAM DOS...")
+            if settings.fits_Debye_model:
+                phonon.set_Debye_frequency()
+                if log_level:
+                    debye_freq = phonon.get_Debye_frequency()
+                    print("Debye frequency: %10.5f" % debye_freq)
+            phonon.write_pam_dos()
+            if plot_conf["plot_graph"]:
+                plot = phonon.plot_pam_dos()
+                if plot_conf["save_graph"]:
+                    plot.savefig("pam_dos.pdf")
+                else:
+                    plot.show()
 
         #
         # Total DOS
@@ -1609,7 +1636,6 @@ def _start_phonopy(**argparse_control):
             print("Spglib version %d.%d.%d" % spglib.get_version())
 
         print("")
-
         if deprecated:
             show_deprecated_option_warnings(deprecated)
 
@@ -1862,7 +1888,6 @@ def _init_phonopy(settings, cell_info, symprec, log_level):
         else:
             physical_units = get_default_physical_units(cell_info["interface_mode"])
             freq_factor = physical_units["factor"]
-
         phonon = Phonopy(
             cell_info["unitcell"],
             cell_info["supercell_matrix"],
@@ -1878,9 +1903,7 @@ def _init_phonopy(settings, cell_info, symprec, log_level):
             calculator=cell_info["interface_mode"],
             log_level=log_level,
         )
-
         _check_supercell_in_yaml(cell_info, phonon, log_level)
-
     # Set atomic masses of primitive cell
     if settings.masses is not None:
         phonon.masses = settings.masses
@@ -2123,7 +2146,6 @@ def main(**argparse_control):
         _create_random_displacements_at_finite_temperature(
             phonon, settings, confs, cell_info["optional_structure_info"], log_level
         )
-
     #######################
     # Phonon calculations #
     #######################
@@ -2153,8 +2175,96 @@ def main(**argparse_control):
             print(" - %s" % mode)
         print("-" * 76)
 
-    _run_calculation(phonon, settings, plot_conf, log_level)
+    if args.ldos:
+        mesh_numbers = settings.mesh_numbers
+        if mesh_numbers is None:
+            mesh_numbers = 50.0
+        mesh_shift = settings.mesh_shift
+        t_symmetry = settings.is_time_reversal_symmetry
+        q_symmetry = settings.is_mesh_symmetry
+        is_gamma_center = settings.is_gamma_center
 
+        if (
+            settings.is_thermal_displacements
+            or settings.is_thermal_displacement_matrices
+        ):  # noqa E129
+            if settings.cutoff_frequency is not None:
+                if log_level:
+                    print_error_message(
+                        "Use FMIN (--fmin) instead of CUTOFF_FREQUENCY "
+                        "(--cutoff-freq)."
+                    )
+                    print_error()
+                sys.exit(1)
+
+            phonon.init_mesh(
+                mesh=mesh_numbers,
+                shift=mesh_shift,
+                is_time_reversal=t_symmetry,
+                is_mesh_symmetry=q_symmetry,
+                with_eigenvectors=settings.is_eigenvectors,
+                is_gamma_center=is_gamma_center,
+                use_iter_mesh=True,
+            )
+            if log_level:
+                print("Mesh numbers: %s" % phonon.mesh_numbers)
+        else:
+            phonon.init_mesh(
+                mesh=mesh_numbers,
+                shift=mesh_shift,
+                is_time_reversal=t_symmetry,
+                is_mesh_symmetry=q_symmetry,
+                with_eigenvectors=True,
+                with_group_velocities=settings.is_group_velocity,
+                is_gamma_center=is_gamma_center,
+            )
+            if log_level:
+                print("Mesh numbers: %s" % phonon.mesh_numbers)
+                weights = phonon.mesh.weights
+                if q_symmetry:
+                    print(
+                        "Number of irreducible q-points on sampling mesh: "
+                        "%d/%d" % (weights.shape[0], np.prod(phonon.mesh_numbers))
+                    )
+                else:
+                    print("Number of q-points on sampling mesh: %d" % weights.shape[0])
+                print("Calculating phonons on sampling mesh...")
+
+            phonon.mesh.run()
+
+            if settings.write_mesh:
+                if settings.is_hdf5 or settings.mesh_format == "hdf5":
+                    phonon.write_hdf5_mesh()
+                else:
+                    phonon.write_yaml_mesh()
+        phonon.run_pam_dos(
+                sigma=settings.sigma,
+                freq_min=settings.min_frequency,
+                freq_max=settings.max_frequency,
+                freq_pitch=settings.frequency_pitch,
+                use_tetrahedron_method=settings.is_tetrahedron_method,
+            )
+
+        if log_level:
+            print("Calculating PAMDOS...")
+
+        if settings.fits_Debye_model:
+            phonon.set_Debye_frequency()
+            if log_level:
+                debye_freq = phonon.get_Debye_frequency()
+                print("Debye frequency: %10.5f" % debye_freq)
+        phonon.write_pam_dos()
+
+        if plot_conf["plot_graph"]:
+            plot = phonon.plot_pam_dos()
+            if plot_conf["save_graph"]:
+                plot.savefig("pam_dos.pdf")
+            else:
+                plot.show()
+    else:
+        _run_calculation(phonon, settings, plot_conf, log_level)
+
+    #_run_calculation(phonon, settings, plot_conf, log_level)
     ########################
     # Phonopy finalization #
     ########################

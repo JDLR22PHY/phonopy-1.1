@@ -898,6 +898,15 @@ def get_parser(fc_symmetry=False, is_nac=False, load_phonopy_yaml=False):
         default=None,
         help="Project PDOS x, y, z directions in Cartesian coordinates",
     )
+
+    parser.add_argument(
+    "-ldos",
+    dest="ldos",
+    action="store_true",
+    default=False,
+    help="Calculate phonon DOS with PAM projection",
+    )
+
     if load_phonopy_yaml:
         parser.add_argument("filename", nargs="*", help="phonopy.yaml like file")
     else:

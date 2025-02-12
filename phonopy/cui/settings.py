@@ -1212,6 +1212,7 @@ class PhonopySettings(Settings):
         "create_force_constants": None,
         "cutoff_radius": None,
         "dos": None,
+        "ldos": False,
         "fc_spg_symmetry": False,
         "fits_Debye_model": False,
         "max_frequency": None,
@@ -1324,6 +1325,10 @@ class PhonopySettings(Settings):
     def set_fits_Debye_model(self, val):
         """Set fits_Debye_model."""
         self._v["fits_Debye_model"] = val
+
+    def set_ldos(self, val):
+        """Set ldos flag (PAM DOS calculation)."""
+        self._v["ldos"] = val
 
     def set_max_frequency(self, val):
         """Set max_frequency."""
@@ -1565,6 +1570,9 @@ class PhonopyConfParser(ConfParser):
         if "is_dos_mode" in arg_list:
             if self._args.is_dos_mode:
                 self._confs["dos"] = ".true."
+
+        if "ldos" in arg_list:
+            self._confs["ldos"] = ".true." if self._args.ldos else ".false."
 
         if "pdos" in arg_list:
             if self._args.pdos is not None:
@@ -1956,6 +1964,12 @@ class PhonopyConfParser(ConfParser):
                     self.set_parameter("dos", True)
                 elif confs["dos"].lower() == ".false.":
                     self.set_parameter("dos", False)
+            
+            if conf_key == "ldos":
+                if confs["ldos"].lower() == ".true.":
+                    self.set_parameter("ldos", True)
+                elif confs["ldos"].lower() == ".false.":
+                    self.set_parameter("ldos", False)
 
             if conf_key == "debye_model":
                 if confs["debye_model"].lower() == ".true.":
@@ -2289,8 +2303,12 @@ class PhonopyConfParser(ConfParser):
             self._settings.set_min_frequency(fmin)
             self._settings.set_max_frequency(fmax)
             self._settings.set_frequency_pitch(fpitch)
+        
         if "dos" in params:
             self._settings.set_is_dos_mode(params["dos"])
+
+        if "ldos" in params:
+            self._settings.set_ldos(params["ldos"])
 
         if "fits_debye_model" in params:
             self._settings.set_fits_Debye_model(params["fits_debye_model"])
