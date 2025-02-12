@@ -1,79 +1,77 @@
-[![Version Badge](https://anaconda.org/conda-forge/phonopy/badges/version.svg)](https://anaconda.org/conda-forge/phonopy)
-[![Downloads Badge](https://anaconda.org/conda-forge/phonopy/badges/downloads.svg)](https://anaconda.org/conda-forge/phonopy)
-[![PyPI](https://img.shields.io/pypi/dm/phonopy.svg?maxAge=2592000)](https://pypi.python.org/pypi/phonopy)
-[![codecov](https://codecov.io/gh/phonopy/phonopy/branch/develop/graph/badge.svg)](https://codecov.io/gh/phonopy/phonopy)
+# Phonopy with PAM
 
-# Phonopy
+This version incorporates capabilities to compute the phonon angular momentum (PAM) and the corresponding density of states (DOS) resolved by the sign of the angular momentum. In this version, you can compute not only the total phonon DOS but also a DOS that is resolved into contributions from positive or negative PAM. In addition, the integration of both the total DOS and the PAM-resolved DOS is now available.
 
-Phonon code mainly written in python. Phonopy user documentation is found at
-http://phonopy.github.io/phonopy/
+> **Important:**  
+> In this release, the Bose–Einstein distribution is **not** included in the DOS integration, the temperature is fixed (i.e. no temperature-dependent occupation), and the number of frequency points (the resolution of the DOS) is currently hardcoded to 600.
+
+## New Features
+
+- **Phonon Angular Momentum Calculator:**  
+  A new calculator that computes the phonon angular momentum for a given q-mesh. This feature allows one to analyze the angular momentum content of phonon modes.
+
+- **PAM-Resolved DOS:**  
+  In addition to the total DOS, you can now compute a density of states resolved by phonon angular momentum. That is, the integration can be performed separately for positive and negative phonon angular momentum contributions.
+
+- **DOS Integration:**  
+  The integrated DOS is available both for the total phonon DOS and for the PAM-resolved DOS. Note that at this stage, the integration does not account for the Bose–Einstein distribution, the temperature is fixed, and the frequency resolution is set to 600 points.
 
 ## Installation
 
-See https://phonopy.github.io/phonopy/install.html.
+You can compile Phonopy from the source code as explained in the [official installation instructions](https://phonopy.github.io/phonopy/install.html#installation-from-source-code).
 
-## Dependency
+> **Disclaimer:**  
+> A less recommended (but possible) approach for testing these new features is to copy the `phonopy` folder (the folder inside the repository that bears the same name) directly into the installation directory of the Phonopy library in your environment. **Warning:** This method is risky since it bypasses a full reinstallation/compilation of Phonopy and may lead to unexpected behavior if there are mismatches between the modified code and other installed modules.
 
-See `requirements.txt`. Optionally `symfc`, `scipy` and `seekpath` are required
-for using additional features.
+## Usage
 
-## Mailing list for questions
-
-Usual phonopy questions should be sent to phonopy mailing list
-(https://sourceforge.net/p/phonopy/mailman/).
-
-## Development
-
-The development of phonopy is managed on the `develop` branch of github phonopy
-repository.
-
-- Github issues is the place to discuss about phonopy issues.
-- Github pull request is the place to request merging source code.
-
-### Formatting
-
-Formatting rules are found in `pyproject.toml`.
-
-### pre-commit
-
-Pre-commit (https://pre-commit.com/) is mainly used for applying the formatting
-rules automatically. Therefore, it is strongly encouraged to use it at or before
-git-commit. Pre-commit is set-up and used in the following way:
-
-- Installed by `pip install pre-commit`, `conda install pre_commit` or see
-  https://pre-commit.com/#install.
-- pre-commit hook is installed by `pre-commit install`.
-- pre-commit hook is run by `pre-commit run --all-files`.
-
-Unless running pre-commit, pre-commit.ci may push the fix at PR by github
-action. In this case, the fix should be merged by the contributor's repository.
-
-### VSCode setting
-- Not strictly, but VSCode's `settings.json` may be written like below
-
-  ```json
-  "ruff.lint.args": [
-      "--config=${workspaceFolder}/pyproject.toml",
-  ],
-  "[python]": {
-      "editor.defaultFormatter": "charliermarsh.ruff",
-      "editor.codeActionsOnSave": {
-          "source.organizeImports": "explicit"
-      }
-  },
-  ```
-
-## Documentation
-
-Phonopy user documentation is written using python sphinx. The source files are
-stored in `doc` directory. Please see how to write the documentation at
-`doc/README.md`.
-
-## How to run tests
-
-Tests are written using pytest. To run tests, pytest has to be installed. The
-tests can be run by
+Once installed, you can run the new features using the `phonopy-load` command. For example, the following command initializes a mesh sampling calculation and then computes and plots the PAM-resolved DOS:
 
 ```bash
-% pytest
+phonopy-load --mesh 61 61 61 -p -ldos --fmin 0 -s
 ```
+
+Alternatively, running the `phonopy` command without the `-ldos` option will perform a standard calculation (e.g., band structure or mesh mode) without calculating the PAM-resolved DOS.
+
+### Explanation of the Command Options
+
+- `--mesh 61 61 61`  
+  Specifies the q-mesh grid. In this example, a 61×61×61 mesh is used for sampling the phonon dispersion and DOS.
+
+- `-p`  
+  Tells Phonopy to plot the results. This flag enables the graphical output. (Note: The plotting mode is only active in modes that support it—here, it is used with mesh mode.)
+
+- `-ldos`  
+  Activates the new feature for calculating the **phonon angular momentum–resolved DOS (PAM-DOS)**. When this flag is set, Phonopy will run the new PAM DOS routines in place of the traditional DOS calculation.
+
+- `--fmin 0`  
+  Sets the minimum frequency for the DOS calculation. Only phonon frequencies above this threshold will be considered when integrating the DOS.
+
+- `-s`  
+  Instructs Phonopy to save the plotted graph (as a file, for example in PDF format) instead of just displaying it interactively.
+
+## Example Workflow
+
+1. **Standard PAM DOS Calculation:**  
+   Run the command below to calculate the PAM-resolved DOS on a 61×61×61 mesh:
+   ```bash
+   phonopy-load --mesh 61 61 61 -p -ldos --fmin 0 -s
+   ```
+   In this case, Phonopy will:
+   - Initialize a 61×61×61 q-mesh.
+   - Run the new phonon angular momentum calculations.
+   - Compute and integrate the PAM-resolved DOS (for both total and positive/negative PAM contributions).
+   - Plot and save the PAM DOS (as indicated by `-p` and `-s`).
+
+2. **Standard Calculation without PAM DOS:**  
+   If you omit the `-ldos` flag, Phonopy will execute its standard mesh or band mode calculations:
+   ```bash
+   phonopy-load --mesh 61 61 61 -p --fmin 0 -s
+   ```
+   This command runs a mesh sampling calculation and plots the total DOS without resolving the angular momentum contributions.
+
+## Notes
+
+- The integration of the DOS is currently performed with 600 frequency points (fixed resolution).
+- The temperature used in the DOS integration is fixed (no temperature dependence), and the Bose–Einstein distribution is not applied at this time.
+- These new features are experimental and subject to further improvement in future releases.
