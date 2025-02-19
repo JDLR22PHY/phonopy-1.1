@@ -28,6 +28,7 @@ source phonopy_test/bin/activate
 git clone https://github.com/brayanb1701/phonopy-1.git
 cd phonopy-1
 git checkout pam_ldos_integration
+git tag -a v2.28.1 -m "version 2.28.1"
 python -m pip install --upgrade pip
 pip install numpy wheel setuptools
 sudo apt-get install build-essential python3-dev
