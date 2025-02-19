@@ -33,6 +33,7 @@ pip install numpy wheel setuptools
 sudo apt-get install build-essential python3-dev
 sudo apt-get update
 rm -rf build/ dist/ *.egg-info/
+pip install . -vvv || true
 pip install . -vvv
 ```
 
