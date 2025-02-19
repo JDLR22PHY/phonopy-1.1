@@ -25,7 +25,6 @@ Here are the commands:
 #These commands are for creating an environment
 python -m venv phonopy_test
 source phonopy_test/bin/activate
-#----
 git clone https://github.com/brayanb1701/phonopy-1.git
 cd phonopy-1
 git checkout pam_ldos_integration
@@ -33,6 +32,7 @@ python -m pip install --upgrade pip
 pip install numpy wheel setuptools
 sudo apt-get install build-essential python3-dev
 sudo apt-get update
+rm -rf build/ dist/ *.egg-info/
 pip install . -vvv
 ```
 
