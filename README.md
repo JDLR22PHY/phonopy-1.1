@@ -20,6 +20,17 @@ This version incorporates capabilities to compute the phonon angular momentum (P
 
 You can compile Phonopy from the source code as explained in the [official installation instructions](https://phonopy.github.io/phonopy/install.html#installation-from-source-code).
 
+Here are the commands:
+```bash
+git clone https://github.com/brayanb1701/phonopy-1.git
+cd phonopy-1
+git checkout pam_ldos_integration
+#These commands are for creating an environment
+python -m venv phonopy_test
+source phonopy_test/bin/activate
+pip install . -vvv
+```
+
 > **Disclaimer:**  
 > A less recommended (but possible) approach for testing these new features is to copy the `phonopy` folder (the folder inside the repository that bears the same name) directly into the installation directory of the Phonopy library in your environment. **Warning:** This method is risky since it bypasses a full reinstallation/compilation of Phonopy and may lead to unexpected behavior if there are mismatches between the modified code and other installed modules.
 
