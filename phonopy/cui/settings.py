@@ -1213,6 +1213,8 @@ class PhonopySettings(Settings):
         "cutoff_radius": None,
         "dos": None,
         "ldos": False,
+        "int_ldos": False,
+        "pam_temp": None,
         "fc_spg_symmetry": False,
         "fits_Debye_model": False,
         "max_frequency": None,
@@ -1329,6 +1331,14 @@ class PhonopySettings(Settings):
     def set_ldos(self, val):
         """Set ldos flag (PAM DOS calculation)."""
         self._v["ldos"] = val
+
+    def set_int_ldos(self, val):
+        """Set int_ldos flag (integration of PAM DOS calculation)."""
+        self._v["int_ldos"] = val
+
+    def set_pam_temp(self, val):
+        """Set pam_temp."""
+        self._v["pam_temp"] = val
 
     def set_max_frequency(self, val):
         """Set max_frequency."""
@@ -1573,6 +1583,13 @@ class PhonopyConfParser(ConfParser):
 
         if "ldos" in arg_list:
             self._confs["ldos"] = ".true." if self._args.ldos else ".false."
+
+        if "int_ldos" in arg_list:
+            self._confs["int_ldos"] = ".true." if self._args.int_ldos else ".false."
+
+        if "pam_temp" in arg_list:
+            if self._args.pam_temp is not None:
+                self._confs["pam_temp"] = self._args.pam_temp
 
         if "pdos" in arg_list:
             if self._args.pdos is not None:
@@ -1971,6 +1988,13 @@ class PhonopyConfParser(ConfParser):
                 elif confs["ldos"].lower() == ".false.":
                     self.set_parameter("ldos", False)
 
+            if conf_key == "int_ldos":
+                if confs["int_ldos"].lower() == ".true.":
+                    self.set_parameter("int_ldos", True)
+
+            if conf_key == "pam_temp":
+                self.set_parameter("pam_temp", float(confs["pam_temp"]))
+
             if conf_key == "debye_model":
                 if confs["debye_model"].lower() == ".true.":
                     self.set_parameter("fits_debye_model", True)
@@ -2309,6 +2333,12 @@ class PhonopyConfParser(ConfParser):
 
         if "ldos" in params:
             self._settings.set_ldos(params["ldos"])
+        
+        if "int_ldos" in params:
+            self._settings.set_int_ldos(params["int_ldos"])
+
+        if "pam_temp" in params:
+            self._settings.set_pam_temp(params["pam_temp"])
 
         if "fits_debye_model" in params:
             self._settings.set_fits_Debye_model(params["fits_debye_model"])

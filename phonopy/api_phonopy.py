@@ -2309,6 +2309,7 @@ class Phonopy:
         freq_max=None,
         freq_pitch=None,
         use_tetrahedron_method=True,
+        temperature=None,
     ) -> None:
         """Calculate the phonon angular momentum–resolved DOS.
         
@@ -2326,7 +2327,7 @@ class Phonopy:
             raise RuntimeError(msg)
 
         pam_dos = PAMDos(
-            self._mesh, sigma=sigma, use_tetrahedron_method=use_tetrahedron_method
+            self._mesh, sigma=sigma, use_tetrahedron_method=use_tetrahedron_method, temperature=temperature, freq_min=freq_min, freq_max=freq_max
         )
         pam_dos.set_draw_area(freq_min, freq_max, freq_pitch)
         pam_dos.run()
@@ -2367,6 +2368,17 @@ class Phonopy:
         """Write PAM projected DOS to text file."""
         self._pam_dos.write_pam_dos(filename=filename)
 
+    def write_pam_dos(self, filename="pam_dos.dat") -> None:
+        """Write PAM projected DOS to text file."""
+        self._pam_dos.write_pam_dos(filename=filename)
+
+    def integrate_pam_dos(self, freq_min=None, freq_max=None):
+        """Integrate PAM projected DOS."""
+        if self._pam_dos is None:
+            msg = "run_pam_dos has to be done before integrating " "PAM DOS."
+            raise RuntimeError(msg)
+
+        return self._pam_dos.save_integration_results(freq_min=freq_min, freq_max=freq_max)    
 
     def set_total_DOS(
         self,

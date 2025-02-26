@@ -2242,6 +2242,7 @@ def main(**argparse_control):
                 freq_min=settings.min_frequency,
                 freq_max=settings.max_frequency,
                 freq_pitch=settings.frequency_pitch,
+                temperature=settings.pam_temp,
                 use_tetrahedron_method=settings.is_tetrahedron_method,
             )
 
@@ -2261,6 +2262,89 @@ def main(**argparse_control):
                 plot.savefig("pam_dos.pdf")
             else:
                 plot.show()
+
+    elif args.int_ldos:
+        mesh_numbers = settings.mesh_numbers
+        if mesh_numbers is None:
+            mesh_numbers = 50.0
+        mesh_shift = settings.mesh_shift
+        t_symmetry = settings.is_time_reversal_symmetry
+        q_symmetry = settings.is_mesh_symmetry
+        is_gamma_center = settings.is_gamma_center
+
+        if (
+            settings.is_thermal_displacements
+            or settings.is_thermal_displacement_matrices
+        ):  # noqa E129
+            if settings.cutoff_frequency is not None:
+                if log_level:
+                    print_error_message(
+                        "Use FMIN (--fmin) instead of CUTOFF_FREQUENCY "
+                        "(--cutoff-freq)."
+                    )
+                    print_error()
+                sys.exit(1)
+
+            phonon.init_mesh(
+                mesh=mesh_numbers,
+                shift=mesh_shift,
+                is_time_reversal=t_symmetry,
+                is_mesh_symmetry=q_symmetry,
+                with_eigenvectors=settings.is_eigenvectors,
+                is_gamma_center=is_gamma_center,
+                use_iter_mesh=True,
+            )
+            if log_level:
+                print("Mesh numbers: %s" % phonon.mesh_numbers)
+        else:
+            phonon.init_mesh(
+                mesh=mesh_numbers,
+                shift=mesh_shift,
+                is_time_reversal=t_symmetry,
+                is_mesh_symmetry=q_symmetry,
+                with_eigenvectors=True,
+                with_group_velocities=settings.is_group_velocity,
+                is_gamma_center=is_gamma_center,
+            )
+            if log_level:
+                print("Mesh numbers: %s" % phonon.mesh_numbers)
+                weights = phonon.mesh.weights
+                if q_symmetry:
+                    print(
+                        "Number of irreducible q-points on sampling mesh: "
+                        "%d/%d" % (weights.shape[0], np.prod(phonon.mesh_numbers))
+                    )
+                else:
+                    print("Number of q-points on sampling mesh: %d" % weights.shape[0])
+                print("Calculating phonons on sampling mesh...")
+
+            phonon.mesh.run()
+
+            if settings.write_mesh:
+                if settings.is_hdf5 or settings.mesh_format == "hdf5":
+                    phonon.write_hdf5_mesh()
+                else:
+                    phonon.write_yaml_mesh()
+        phonon.run_pam_dos(
+                sigma=settings.sigma,
+                freq_min=settings.min_frequency,
+                freq_max=settings.max_frequency,
+                freq_pitch=settings.frequency_pitch,
+                temperature=settings.pam_temp,
+                use_tetrahedron_method=settings.is_tetrahedron_method,
+            )
+
+        if log_level:
+            print("Calculating PAMDOS...")
+
+        if settings.fits_Debye_model:
+            phonon.set_Debye_frequency()
+            if log_level:
+                debye_freq = phonon.get_Debye_frequency()
+                print("Debye frequency: %10.5f" % debye_freq)
+        phonon.write_pam_dos()
+        phonon.integrate_pam_dos(freq_min=settings.min_frequency, freq_max=settings.max_frequency)
+
     else:
         _run_calculation(phonon, settings, plot_conf, log_level)
 

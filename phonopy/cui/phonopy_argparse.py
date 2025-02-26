@@ -907,6 +907,22 @@ def get_parser(fc_symmetry=False, is_nac=False, load_phonopy_yaml=False):
     help="Calculate phonon DOS with PAM projection",
     )
 
+    parser.add_argument(
+    "-int_ldos",
+    dest="int_ldos",
+    action="store_true",
+    default=False,
+    help="Integrate the phonon DOS with PAM projection in a given frequency range",
+    )
+
+    parser.add_argument(
+    "--pam-temp",
+    dest="pam_temp",
+    action="store_true",
+    default=0,
+    help="Temperature for PAM calculations",
+    )
+
     if load_phonopy_yaml:
         parser.add_argument("filename", nargs="*", help="phonopy.yaml like file")
     else:

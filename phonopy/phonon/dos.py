@@ -852,30 +852,55 @@ class PAMDos(Dos):
             # Use tetrahedron method
             self._run_tetrahedron_method_dos()
 
+
+    def save_integration_results(self, filename="pam_dos_integration_results.txt"):
+        """
+        Computes the integrated positive and negative PAM DOS over the frequency range
+        [freq_min, freq_max] at the given temperature, and saves the results to a text file.
+        
+        The output file contains:
+        - Frequency range and temperature information.
+        - The integrated positive PAM DOS.
+        - The integrated negative PAM DOS.
+        - The difference (positive minus negative).
+        
+        Parameters
+        ----------
+        filename : str
+            The name of the output file. Defaults to "pam_dos_integration_results.txt".
+        
+        Raises
+        ------
+        ValueError
+            If either freq_min or freq_max is not defined.
+        """
         if self.freq_min is None:
             self.freq_min = 0
         if self.freq_max is None:
             self.freq_max = self._frequency_points.max()
-        # Perform integration over frequency range with Bose-Einstein distribution
-        if self.freq_min is not None and self.freq_max is not None:
-            self.integrated_positive_dos = self.integrate_states_in_frequency_range(
-                self.freq_min, self.freq_max, self.dos_positive, self.temperature
-            )
-            self.integrated_negative_dos = self.integrate_states_in_frequency_range(
-                self.freq_min, self.freq_max, self.dos_negative, self.temperature
-            )
-            print(
-                f"Integrated Positive PAM DOS from {self.freq_min} to {self.freq_max} THz at {self.temperature} K:"
-            )
-            print(self.integrated_positive_dos)
-            print(
-                f"Integrated Negative PAM DOS from {self.freq_min} to {self.freq_max} THz at {self.temperature} K:"
-            )
-            print(self.integrated_negative_dos)
-            print(
-                f"Difference between Integrated Positive and Negative PAM DOS from {self.freq_min} to {self.freq_max} THz at {self.temperature} K:"
-            )
-            print(self.integrated_positive_dos-self.integrated_negative_dos)
+
+        if self.freq_min is None or self.freq_max is None:
+            raise ValueError("Frequency range is not completely specified (freq_min and/or freq_max missing).")
+
+        self.integrated_positive_dos = self.integrate_states_in_frequency_range(
+            self.freq_min, self.freq_max, self.dos_positive, self.temperature
+        )
+        self.integrated_negative_dos = self.integrate_states_in_frequency_range(
+            self.freq_min, self.freq_max, self.dos_negative, self.temperature
+        )
+        diff_dos = self.integrated_positive_dos - self.integrated_negative_dos
+
+        with open(filename, "w") as file:
+            file.write("PAM DOS Integration Results\n")
+            file.write("=" * 35 + "\n")
+            file.write(f"Frequency Range: {self.freq_min} to {self.freq_max} THz\n")
+            file.write(f"Temperature: {self.temperature} K\n\n")
+            file.write("Integrated Positive PAM DOS:\n")
+            file.write(f"{self.integrated_positive_dos}\n\n")
+            file.write("Integrated Negative PAM DOS:\n")
+            file.write(f"{self.integrated_negative_dos}\n\n")
+            file.write("Difference (Positive - Negative):\n")
+            file.write(f"{diff_dos}\n")
 
     def _run_smearing_method(self):
         """Calculate PAM-resolved DOS using the smearing method."""
