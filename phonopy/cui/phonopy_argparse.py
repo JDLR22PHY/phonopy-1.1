@@ -900,12 +900,45 @@ def get_parser(fc_symmetry=False, is_nac=False, load_phonopy_yaml=False):
     )
 
     parser.add_argument(
-    "-ldos",
-    dest="ldos",
-    action="store_true",
-    default=False,
-    help="Calculate phonon DOS with PAM projection",
+        "--pamdos",
+        dest="pamdos",
+        action="store_true",
+        default=False,
+        help="Calculate phonon DOS with PAM projection",
     )
+
+    parser.add_argument(
+        "--pam-bands",
+        dest="pam_bands",
+        action="store_true",
+        default=False,
+        help="Calculate PAM projection for bands",
+    )
+
+    parser.add_argument(
+        "--int-pamdos",
+        dest="int_pamdos",
+        action="store_true",
+        default=False,
+        help="Save the results of the integration of PAM Dos",
+    )
+
+    parser.add_argument(
+        "--with-pam-bands",
+        dest="with_pam_bands",
+        action="store_true",
+        default=False,
+        help="Save the results of the integration of PAM Dos",
+    )
+
+    parser.add_argument(
+        "--pam-temperature",
+        dest="pam_temperature",
+        type=float,
+        default=0,
+        help="Set temperature for PAM calculations",
+    )
+
 
     if load_phonopy_yaml:
         parser.add_argument("filename", nargs="*", help="phonopy.yaml like file")

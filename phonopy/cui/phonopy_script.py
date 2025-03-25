@@ -1349,7 +1349,7 @@ def _run_calculation(phonon: Phonopy, settings, plot_conf, log_level):
         #
         # DOS based on PAM
         #
-        elif settings.ldos and run_mode in ("mesh", "band_mesh"):
+        elif settings.pamdos and run_mode in ("mesh", "band_mesh"):
             # Run the PAM DOS calculation:
             phonon.run_pam_dos(
                 sigma=settings.sigma,
@@ -1357,6 +1357,8 @@ def _run_calculation(phonon: Phonopy, settings, plot_conf, log_level):
                 freq_max=settings.max_frequency,
                 freq_pitch=settings.frequency_pitch,
                 use_tetrahedron_method=settings.is_tetrahedron_method,
+                temperature=settings.pam_temperature,
+                int_pamdos=settings.int_pamdos
             )
             if log_level:
                 print("Calculating PAM DOS...")
@@ -1366,12 +1368,14 @@ def _run_calculation(phonon: Phonopy, settings, plot_conf, log_level):
                     debye_freq = phonon.get_Debye_frequency()
                     print("Debye frequency: %10.5f" % debye_freq)
             phonon.write_pam_dos()
-            if plot_conf["plot_graph"]:
+            if settings.with_pam_bands:
+                plot=phonon.plot_band_structure_and_pam_dos(temperature=settings.pam_temperature)              
+            if plot_conf["plot_graph"] and not settings.with_pam_bands:
                 plot = phonon.plot_pam_dos()
-                if plot_conf["save_graph"]:
-                    plot.savefig("pam_dos.pdf")
-                else:
-                    plot.show()
+            if plot_conf["save_graph"]:
+                plot.savefig("pam_dos_with_bands.pdf") if settings.with_pam_bands else plot.savefig("pam_dos.pdf")
+            else:
+                plot.show()
 
         #
         # Total DOS
@@ -1486,7 +1490,50 @@ def _run_calculation(phonon: Phonopy, settings, plot_conf, log_level):
                 plot.savefig("band_dos.pdf")
             else:
                 plot.show()
-
+    #
+    #Phonon Angular Momentum for bands
+    #
+    elif run_mode == "pam":
+        # Check if band.yaml exists
+        if not os.path.exists("band.yaml"):
+            if log_level:
+                print_error_message("band.yaml file not found. Run band structure calculation first.")
+                print_error_message("Use BAND = or --band option to calculate band structure.")
+                if log_level > 0:
+                    print_error()
+            return
+        
+        if log_level:
+            print("Calculating Phonon Angular Momentum (PAM) based on band.yaml...")
+        
+        # Set temperature from settings if available
+        temperature = settings.pam_temperature 
+        
+        # Write PAM data to file
+        output_file = "pam_data.txt"
+        Jxyz, distances, frequencies, segment_nqpoint, labels = phonon.write_pam_from_yaml(yaml_file="band.yaml", output_file=output_file, temperature=temperature)
+        
+        if log_level:
+            print(f"PAM data has been written to '{output_file}'")
+        
+        # Create plot if requested
+        if plot_conf["plot_graph"]:
+            figname = "pam.png" if plot_conf["save_graph"] else None
+            plot = phonon.plot_pam_bands(distances=distances,
+                 frequencies=frequencies,
+                 Jxyz=Jxyz,
+                 segment_nqpoint=segment_nqpoint,
+                 labels=labels)
+            
+            if plot_conf["save_graph"]:
+                plot.savefig(figname)
+                if log_level:
+                    print(f"PAM plot has been saved to '{figname}'")
+            else:
+                plot.tight_layout()
+                plot.show()
+                print("Successfully created the PAM projection over bands")
+                input("Press Enter to continue...") 
     #
     # Animation
     #
@@ -2157,6 +2204,7 @@ def main(**argparse_control):
         "modulation",
         "irreps",
         "qpoints",
+        "pam",
     ):
         print("-" * 76)
         print(
@@ -2175,7 +2223,7 @@ def main(**argparse_control):
             print(" - %s" % mode)
         print("-" * 76)
 
-    if args.ldos:
+    '''if args.pamdos:
         mesh_numbers = settings.mesh_numbers
         if mesh_numbers is None:
             mesh_numbers = 50.0
@@ -2262,9 +2310,9 @@ def main(**argparse_control):
             else:
                 plot.show()
     else:
-        _run_calculation(phonon, settings, plot_conf, log_level)
+        _run_calculation(phonon, settings, plot_conf, log_level)'''
 
-    #_run_calculation(phonon, settings, plot_conf, log_level)
+    _run_calculation(phonon, settings, plot_conf, log_level)
     ########################
     # Phonopy finalization #
     ########################

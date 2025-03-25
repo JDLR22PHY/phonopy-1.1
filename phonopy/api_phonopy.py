@@ -77,6 +77,7 @@ from phonopy.interface.pypolymlp import (
 from phonopy.phonon.animation import write_animation
 from phonopy.phonon.band_structure import BandStructure, get_band_qpoints_by_seekpath
 from phonopy.phonon.dos import ProjectedDos, TotalDos, PAMDos, get_dos_frequency_range
+from phonopy.phonon.pam import calculate_pam, plot_pam_data, write_pam_data, plot_pam_bands_from_data
 from phonopy.phonon.group_velocity import GroupVelocity
 from phonopy.phonon.irreps import IrReps
 from phonopy.phonon.mesh import IterMesh, Mesh
@@ -2309,6 +2310,8 @@ class Phonopy:
         freq_max=None,
         freq_pitch=None,
         use_tetrahedron_method=True,
+        temperature=0,
+        int_pamdos=False
     ) -> None:
         """Calculate the phonon angular momentum–resolved DOS.
         
@@ -2326,10 +2329,10 @@ class Phonopy:
             raise RuntimeError(msg)
 
         pam_dos = PAMDos(
-            self._mesh, sigma=sigma, use_tetrahedron_method=use_tetrahedron_method
+            self._mesh, sigma=sigma, use_tetrahedron_method=use_tetrahedron_method, temperature=temperature, freq_min=freq_min, freq_max=freq_max,
         )
         pam_dos.set_draw_area(freq_min, freq_max, freq_pitch)
-        pam_dos.run()
+        pam_dos.run(int_pamdos)
         self._pam_dos = pam_dos
 
     def plot_pam_dos(
@@ -2367,6 +2370,244 @@ class Phonopy:
         """Write PAM projected DOS to text file."""
         self._pam_dos.write_pam_dos(filename=filename)
 
+    def run_pam_from_yaml(self, yaml_file: str = "band.yaml", temperature: float = 0.0):
+        """
+        Calculate phonon angular momentum (PAM) from a YAML file.
+        
+        Parameters
+        ----------
+        yaml_file : str, optional
+            Path to the YAML file with phonon data (default: "band.yaml").
+        temperature : float, optional
+            Temperature in Kelvin (default: 0.0).
+        
+        Returns
+        -------
+        tuple :
+            (Jxyz, distances, frequencies, segment_nqpoint, labels)
+            where Jxyz is the PAM array (shape: (3, nqpts, nbnds)),
+            distances is a 1D array of cumulative path distances,
+            frequencies is a 2D array (nqpts x nbnds),
+            segment_nqpoint is a list of q-point counts per segment,
+            and labels is a list of high-symmetry labels (if available).
+        """
+        return calculate_pam(yaml_file=yaml_file, temp=temperature)
+    
+    def plot_pam_bands(self, distances: np.ndarray,
+                 frequencies: np.ndarray,
+                 Jxyz: np.ndarray,
+                 segment_nqpoint,
+                 labels=None,
+                 direction: str = 'a',
+                 plt_type: str = 'scatter',
+                 normalization: str = 'per_direction',
+                 layout: str = 'v',
+                 figsize=None,
+                 band_index: int = None):
+        fig=plot_pam_data(distances=distances,
+                 frequencies=frequencies,
+                 Jxyz=Jxyz,
+                 segment_nqpoint=segment_nqpoint,
+                 labels=labels,
+                 direction=direction,
+                 plt_type=plt_type,
+                 normalization=normalization,
+                 layout=layout,
+                 figsize=figsize,
+                 band_index=band_index)
+        return fig
+        
+    def plot_pam_from_yaml(self, yaml_file: str = "band.yaml", temperature: float = 0.0,
+                           direction: str = 'a', plt_type: str = 'scatter',
+                           normalization: str = 'per_direction', layout: str = 'v',
+                           figsize: tuple = None, band_index: int = None):
+        """
+        Plot phonon angular momentum (PAM) using data from a YAML file.
+        
+        Parameters
+        ----------
+        yaml_file : str, optional
+            Path to the YAML file (default: "band.yaml").
+        temperature : float, optional
+            Temperature in Kelvin (default: 0.0).
+        direction : str, optional
+            'a' to plot all three components, or one of 'x', 'y', 'z' for a single component.
+        plt_type : str, optional
+            Plot type, either 'scatter' (default) or 'colormap'.
+        normalization : str, optional
+            Normalization method: 'per_direction' (default) or 'all'.
+        layout : str, optional
+            Layout of subplots: 'v' (vertical, default) or 'h' (horizontal).
+        figsize : tuple, optional
+            Figure size. If None, default sizes are used.
+        figname : str, optional
+            Output figure filename (default: "pam.png").
+        band_index : int, optional
+            If specified, only that band (index) is plotted.
+        
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The figure object containing the PAM plot.
+        """
+        Jxyz, distances, frequencies, segment_nqpoint, labels = self.run_pam_from_yaml(
+            yaml_file=yaml_file, temperature=temperature)
+        fig = plot_pam_data(distances, frequencies, Jxyz, segment_nqpoint,
+                            labels=labels, direction=direction, plt_type=plt_type,
+                            normalization=normalization, layout=layout,
+                            figsize=figsize, band_index=band_index)
+        return fig
+    
+    def write_pam_bands(self, output_file: str,
+                   distances: np.ndarray,
+                   frequencies: np.ndarray,
+                   Jxyz: np.ndarray,
+                   segment_nqpoint) -> None:
+        write_pam_data(output_file=output_file,
+                   distances=distances,
+                   frequencies=frequencies,
+                   Jxyz=Jxyz,
+                   segment_nqpoint=segment_nqpoint)
+        
+    
+    def write_pam_from_yaml(self, yaml_file: str = "band.yaml", output_file: str = "pam_data.txt", temperature: float = 0.0):
+        """
+        Write the phonon angular momentum (PAM) data to a text file using data from a YAML file.
+        
+        The file will contain columns for Distance, Frequency, Jx, Jy, and Jz.
+        
+        Parameters
+        ----------
+        yaml_file : str, optional
+            Path to the YAML file with phonon data (default: "band.yaml").
+        output_file : str, optional
+            Filename for the output data (default: "pam_data.txt").
+        temperature : float, optional
+            Temperature in Kelvin (default: 0.0).
+        """
+        Jxyz, distances, frequencies, segment_nqpoint, labels = self.run_pam_from_yaml(
+            yaml_file=yaml_file, temperature=temperature)
+        write_pam_data(output_file, distances, frequencies, Jxyz, segment_nqpoint)
+        return Jxyz, distances, frequencies, segment_nqpoint, labels
+
+    def plot_band_structure_and_pam_dos(
+        self, 
+        yaml_file: str = "band.yaml",
+        temperature: float = 0.0,
+        axes_to_plot: list = ['x', 'y', 'z'],  # ['x', 'y', 'z'] or subset
+        plt_type: str = 'scatter',
+        normalization: str = 'per_direction',
+        figsize: tuple = None
+    ):
+        """Plot band structure with PAM projections alongside PAM-DOS.
+        
+        Efficiently creates a combined visualization with one PAM calculation.
+        
+        Parameters
+        ----------
+        yaml_file : str, optional
+            Path to the YAML file with phonon data (default: "band.yaml").
+        temperature : float, optional
+            Temperature in Kelvin (default: 0.0).
+        axes_to_plot : list, optional
+            List of axes to plot, e.g. ['x', 'y', 'z'] or ['x']. Default is all axes.
+        plt_type : str, optional
+            Plot type for PAM band structure: 'scatter' or 'colormap' (default: 'scatter').
+        normalization : str, optional
+            Normalization method: 'per_direction' or 'all' (default: 'per_direction').
+        figsize : tuple, optional
+            Figure size. If None, a default size is used.
+            
+        Returns
+        -------
+        matplotlib.pyplot
+            The matplotlib.pyplot module containing the figure.
+        """
+        import matplotlib.pyplot as plt
+        import matplotlib.gridspec as gridspec
+        import numpy as np
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        
+        # If axes_to_plot is not specified, use all three axes
+        if axes_to_plot is None:
+            axes_to_plot = ['x', 'y', 'z']
+        
+        # Check if PAM DOS calculation has been run
+        if not hasattr(self, '_pam_dos') or self._pam_dos is None:
+            self.run_pam_dos(temperature=temperature)
+        
+        # Calculate PAM data once
+        Jxyz, distances, frequencies, segment_nqpoint, labels = self.run_pam_from_yaml(
+            yaml_file=yaml_file, temperature=temperature)
+        
+        # Create figure with one row per selected axis, two columns (band, DOS)
+        n_rows = len(axes_to_plot)
+        if figsize is None:
+            figsize = (12, 4 * n_rows)
+        
+        fig = plt.figure(figsize=figsize)
+        gs = gridspec.GridSpec(n_rows, 2, width_ratios=[3, 1])
+        
+        # Dictionary to map axis names to indices
+        axis_dict = {'x': 0, 'y': 1, 'z': 2}
+        
+        # Create plots for each selected axis
+        for i, axis in enumerate(axes_to_plot):
+            axis_idx = axis_dict[axis]
+            
+            # Create band structure subplot
+            ax_band = plt.subplot(gs[i, 0])
+            
+            # Plot PAM bands using pre-calculated data
+            _, _, s_m = plot_pam_bands_from_data(
+                Jxyz, 
+                distances, 
+                frequencies, 
+                segment_nqpoint, 
+                labels=labels,
+                direction=axis,
+                plt_type=plt_type,
+                normalization=normalization,
+                ax=ax_band
+            )
+            
+            # Add colorbar
+            divider = make_axes_locatable(ax_band)
+            cax = divider.append_axes('right', size='2%', pad=0.05)
+            cbar = plt.colorbar(s_m, cax=cax)
+            cbar.set_label(f'J{axis}/ℏ')
+            
+            # Create DOS subplot
+            ax_dos = plt.subplot(gs[i, 1], sharey=ax_band)
+            
+            # Extract DOS data for this axis
+            freqs = self._pam_dos.frequency_points
+            pos_dos = self._pam_dos.dos_positive[axis_idx]
+            neg_dos = self._pam_dos.dos_negative[axis_idx]
+            
+            # Plot DOS manually (since plot_pam_dos plots all three axes)
+            ax_dos.plot(pos_dos, freqs, color='red', linestyle='-', label=f'J{axis} > 0')
+            ax_dos.plot(-neg_dos, freqs, color='blue', linestyle='--', label=f'J{axis} < 0')
+            
+            # Add grid and zero line
+            ax_dos.grid(True, ls='--', lw=0.5, color='gray', alpha=0.5)
+            ax_dos.axvline(x=0, ls='-', lw=0.5, color='k', alpha=0.6)
+            
+            # Set axis properties
+            ax_dos.set_xlabel('DOS')
+            ax_dos.set_title(f'J{axis} DOS')
+            # Hide y-tick labels on DOS plot
+            plt.setp(ax_dos.get_yticklabels(), visible=False)
+            
+            # Set x-axis limits for DOS plot
+            max_dos = max(pos_dos.max(), neg_dos.max()) * 1.1
+            ax_dos.set_xlim(-max_dos, max_dos)
+            
+            # Add legend
+            ax_dos.legend(loc='upper right', fontsize='small')
+        
+        plt.tight_layout()
+        return plt
 
     def set_total_DOS(
         self,

@@ -1212,7 +1212,11 @@ class PhonopySettings(Settings):
         "create_force_constants": None,
         "cutoff_radius": None,
         "dos": None,
-        "ldos": False,
+        "pamdos": False,
+        "pam_bands": False,
+        "pam_temperature": 0,
+        "int_pamdos": False,
+        "with_pam_bands": False,
         "fc_spg_symmetry": False,
         "fits_Debye_model": False,
         "max_frequency": None,
@@ -1326,9 +1330,25 @@ class PhonopySettings(Settings):
         """Set fits_Debye_model."""
         self._v["fits_Debye_model"] = val
 
-    def set_ldos(self, val):
-        """Set ldos flag (PAM DOS calculation)."""
-        self._v["ldos"] = val
+    def set_pamdos(self, val):
+        """Set pamdos flag (PAM DOS calculation)."""
+        self._v["pamdos"] = val
+    
+    def set_pam_bands(self, val):
+        """Set pam_bands flag (PAM Bands calculation)."""
+        self._v["pam_bands"] = val
+
+    def set_pam_temperature(self, val):
+        """Set temperature for pam."""
+        self._v["pam_temperature"] = val
+    
+    def set_int_pamdos(self, val):
+        """Set temperature for pam."""
+        self._v["int_pamdos"] = val
+
+    def set_with_pam_bands(self, val):
+        """Set pamdos with bands."""
+        self._v["with_pam_bands"] = val
 
     def set_max_frequency(self, val):
         """Set max_frequency."""
@@ -1571,8 +1591,20 @@ class PhonopyConfParser(ConfParser):
             if self._args.is_dos_mode:
                 self._confs["dos"] = ".true."
 
-        if "ldos" in arg_list:
-            self._confs["ldos"] = ".true." if self._args.ldos else ".false."
+        if "pamdos" in arg_list:
+            self._confs["pamdos"] = ".true." if self._args.pamdos else ".false."
+
+        if "pam_bands" in arg_list:
+            self._confs["pam_bands"] = ".true." if self._args.pam_bands else ".false."
+        
+        if "int_pamdos" in arg_list:
+            self._confs["int_pamdos"] = ".true." if self._args.int_pamdos else ".false."
+
+        if "with_pam_bands" in arg_list:
+            self._confs["with_pam_bands"] = ".true." if self._args.with_pam_bands else ".false."
+
+        if "pam_temperature" in arg_list:
+            self._confs["pam_temperature"] = self._args.pam_temperature if self._args.pam_temperature else 0
 
         if "pdos" in arg_list:
             if self._args.pdos is not None:
@@ -1965,11 +1997,35 @@ class PhonopyConfParser(ConfParser):
                 elif confs["dos"].lower() == ".false.":
                     self.set_parameter("dos", False)
             
-            if conf_key == "ldos":
-                if confs["ldos"].lower() == ".true.":
-                    self.set_parameter("ldos", True)
-                elif confs["ldos"].lower() == ".false.":
-                    self.set_parameter("ldos", False)
+            if conf_key == "pamdos":
+                if confs["pamdos"].lower() == ".true.":
+                    self.set_parameter("pamdos", True)
+                elif confs["pamdos"].lower() == ".false.":
+                    self.set_parameter("pamdos", False)
+
+            if conf_key == "pam_bands":
+                if confs["pam_bands"].lower() == ".true.":
+                    self.set_parameter("pam_bands", True)
+                elif confs["pam_bands"].lower() == ".false.":
+                    self.set_parameter("pam_bands", False)
+            
+            if conf_key == "int_pamdos":
+                if confs["int_pamdos"].lower() == ".true.":
+                    self.set_parameter("int_pamdos", True)
+                elif confs["int_pamdos"].lower() == ".false.":
+                    self.set_parameter("int_pamdos", False)
+            
+            if conf_key == "with_pam_bands":
+                if confs["with_pam_bands"].lower() == ".true.":
+                    self.set_parameter("with_pam_bands", True)
+                elif confs["with_pam_bands"].lower() == ".false.":
+                    self.set_parameter("with_pam_bands", False)
+
+            if conf_key == "pam_temperature":
+                if confs["pam_temperature"] != 0:
+                    self.set_parameter("pam_temperature", confs["pam_temperature"])
+                else:
+                    self.set_parameter("pam_temperature", 0)
 
             if conf_key == "debye_model":
                 if confs["debye_model"].lower() == ".true.":
@@ -2307,8 +2363,25 @@ class PhonopyConfParser(ConfParser):
         if "dos" in params:
             self._settings.set_is_dos_mode(params["dos"])
 
-        if "ldos" in params:
-            self._settings.set_ldos(params["ldos"])
+        if "pamdos" in params:
+            self._settings.set_pamdos(params["pamdos"])
+            self._settings.set_is_eigenvectors(True)
+            self._settings.set_is_mesh_symmetry(False)
+
+        if "pam_bands" in params:
+            self._settings.set_pam_bands(params["pam_bands"])
+            if params["pam_bands"]:  # Only set run mode if pam_bands is True
+                self._settings.set_run_mode("pam")
+                self._settings.set_is_eigenvectors(True)
+
+        if "int_pamdos" in params:
+            self._settings.set_int_pamdos(params["int_pamdos"])
+
+        if "with_pam_bands" in params:
+            self._settings.set_with_pam_bands(params["with_pam_bands"])
+
+        if "pam_temperature" in params:
+            self._settings.set_pam_temperature(params["pam_temperature"])
 
         if "fits_debye_model" in params:
             self._settings.set_fits_Debye_model(params["fits_debye_model"])
