@@ -803,6 +803,28 @@ class PAMDos(Dos):
             # Use tetrahedron method
             self._run_tetrahedron_method_dos()
 
+
+    def save_integration_results(self, filename="pam_dos_integration_results.txt"):
+        """
+        Computes the integrated positive and negative PAM DOS over the frequency range
+        [freq_min, freq_max] at the given temperature, and saves the results to a text file.
+        
+        The output file contains:
+        - Frequency range and temperature information.
+        - The integrated positive PAM DOS.
+        - The integrated negative PAM DOS.
+        - The difference (positive minus negative).
+        
+        Parameters
+        ----------
+        filename : str
+            The name of the output file. Defaults to "pam_dos_integration_results.txt".
+        
+        Raises
+        ------
+        ValueError
+            If either freq_min or freq_max is not defined.
+        """
         if self.freq_min is None:
             self.freq_min = 0
 

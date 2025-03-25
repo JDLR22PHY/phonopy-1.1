@@ -1350,6 +1350,14 @@ class PhonopySettings(Settings):
         """Set pamdos with bands."""
         self._v["with_pam_bands"] = val
 
+    def set_int_ldos(self, val):
+        """Set int_ldos flag (integration of PAM DOS calculation)."""
+        self._v["int_ldos"] = val
+
+    def set_pam_temp(self, val):
+        """Set pam_temp."""
+        self._v["pam_temp"] = val
+
     def set_max_frequency(self, val):
         """Set max_frequency."""
         self._v["max_frequency"] = val
@@ -1605,6 +1613,13 @@ class PhonopyConfParser(ConfParser):
 
         if "pam_temperature" in arg_list:
             self._confs["pam_temperature"] = self._args.pam_temperature if self._args.pam_temperature else 0
+
+        if "int_ldos" in arg_list:
+            self._confs["int_ldos"] = ".true." if self._args.int_ldos else ".false."
+
+        if "pam_temp" in arg_list:
+            if self._args.pam_temp is not None:
+                self._confs["pam_temp"] = self._args.pam_temp
 
         if "pdos" in arg_list:
             if self._args.pdos is not None:
@@ -2026,6 +2041,13 @@ class PhonopyConfParser(ConfParser):
                     self.set_parameter("pam_temperature", confs["pam_temperature"])
                 else:
                     self.set_parameter("pam_temperature", 0)
+
+            if conf_key == "int_ldos":
+                if confs["int_ldos"].lower() == ".true.":
+                    self.set_parameter("int_ldos", True)
+
+            if conf_key == "pam_temp":
+                self.set_parameter("pam_temp", float(confs["pam_temp"]))
 
             if conf_key == "debye_model":
                 if confs["debye_model"].lower() == ".true.":
