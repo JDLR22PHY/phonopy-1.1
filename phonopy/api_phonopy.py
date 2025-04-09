@@ -2403,7 +2403,8 @@ class Phonopy:
                  normalization: str = 'per_direction',
                  layout: str = 'v',
                  figsize=None,
-                 band_index: int = None):
+                 band_index: int = None,
+                 pam_cmap: str = 'seismic'):
         fig=plot_pam_data(distances=distances,
                  frequencies=frequencies,
                  Jxyz=Jxyz,
@@ -2414,13 +2415,14 @@ class Phonopy:
                  normalization=normalization,
                  layout=layout,
                  figsize=figsize,
-                 band_index=band_index)
+                 band_index=band_index,
+                 cmap=pam_cmap)
         return fig
         
     def plot_pam_from_yaml(self, yaml_file: str = "band.yaml", temperature: float = 0.0,
                            direction: str = 'a', plt_type: str = 'scatter',
                            normalization: str = 'per_direction', layout: str = 'v',
-                           figsize: tuple = None, band_index: int = None):
+                           figsize: tuple = None, band_index: int = None, pam_cmap: str = 'seismic'):
         """
         Plot phonon angular momentum (PAM) using data from a YAML file.
         
@@ -2444,7 +2446,9 @@ class Phonopy:
             Output figure filename (default: "pam.png").
         band_index : int, optional
             If specified, only that band (index) is plotted.
-        
+        pam_cmap : str, optional
+            If specified, uses that cmap for the plot.
+            
         Returns
         -------
         matplotlib.figure.Figure
@@ -2455,7 +2459,7 @@ class Phonopy:
         fig = plot_pam_data(distances, frequencies, Jxyz, segment_nqpoint,
                             labels=labels, direction=direction, plt_type=plt_type,
                             normalization=normalization, layout=layout,
-                            figsize=figsize, band_index=band_index)
+                            figsize=figsize, band_index=band_index, cmap=pam_cmap)
         return fig
     
     def write_pam_bands(self, output_file: str,
@@ -2497,7 +2501,8 @@ class Phonopy:
         axes_to_plot: list = ['x', 'y', 'z'],  # ['x', 'y', 'z'] or subset
         plt_type: str = 'scatter',
         normalization: str = 'per_direction',
-        figsize: tuple = None
+        figsize: tuple = None,
+        pam_cmap: str = 'seismic'
     ):
         """Plot band structure with PAM projections alongside PAM-DOS.
         
@@ -2517,7 +2522,9 @@ class Phonopy:
             Normalization method: 'per_direction' or 'all' (default: 'per_direction').
         figsize : tuple, optional
             Figure size. If None, a default size is used.
-            
+        pam_cmap : str, optional
+            cmap used to plot the pam.
+
         Returns
         -------
         matplotlib.pyplot
@@ -2568,7 +2575,8 @@ class Phonopy:
                 direction=axis,
                 plt_type=plt_type,
                 normalization=normalization,
-                ax=ax_band
+                ax=ax_band,
+                cmap=pam_cmap
             )
             
             # Add colorbar
@@ -2586,9 +2594,9 @@ class Phonopy:
             neg_dos = self._pam_dos.dos_negative[axis_idx]
             
             # Plot DOS manually (since plot_pam_dos plots all three axes)
-            ax_dos.plot(pos_dos, freqs, color='red', linestyle='-', label=f'J{axis} > 0')
-            ax_dos.plot(-neg_dos, freqs, color='blue', linestyle='--', label=f'J{axis} < 0')
-            
+            line_pos, = ax_dos.plot(pos_dos, freqs, color='red', linestyle='-', label=f'J{axis} > 0')
+            line_neg, = ax_dos.plot(-neg_dos, freqs, color='blue', linestyle='--', label=f'J{axis} < 0')
+
             # Add grid and zero line
             ax_dos.grid(True, ls='--', lw=0.5, color='gray', alpha=0.5)
             ax_dos.axvline(x=0, ls='-', lw=0.5, color='k', alpha=0.6)
@@ -2596,13 +2604,18 @@ class Phonopy:
             # Set axis properties
             ax_dos.set_xlabel('DOS')
             ax_dos.set_title(f'J{axis} DOS')
-            # Hide y-tick labels on DOS plot
-            plt.setp(ax_dos.get_yticklabels(), visible=False)
-            
-            # Set x-axis limits for DOS plot
-            max_dos = max(pos_dos.max(), neg_dos.max()) * 1.1
-            ax_dos.set_xlim(-max_dos, max_dos)
-            
+            # Ensure y-tick labels are hidden *after* potential adjustments
+            ax_dos.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+
+            # Set x-axis limits based on the plotted data for this component
+            current_max_dos = max(np.max(pos_dos), np.max(neg_dos))
+            # Add a small buffer, avoid division by zero if max is 0
+            lim = current_max_dos * 1.1 if current_max_dos > 1e-9 else 1.0
+            ax_dos.set_xlim(-lim, lim)
+
+            # Re-apply shared y-limits just in case (optional, sharey should handle this)
+            # ax_dos.set_ylim(ax_band.get_ylim())
+
             # Add legend
             ax_dos.legend(loc='upper right', fontsize='small')
         

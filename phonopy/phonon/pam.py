@@ -230,7 +230,7 @@ def write_pam_data(output_file: str,
                                     Jxyz[0, :, band],
                                     Jxyz[1, :, band],
                                     Jxyz[2, :, band]))
-            np.savetxt(f, data, fmt='%.4f', delimiter='\t')
+            np.savetxt(f, data, fmt='%.8f', delimiter='\t')
             f.write("\n")
 
 def plot_pam_bands_from_data(
@@ -243,7 +243,8 @@ def plot_pam_bands_from_data(
     plt_type: str = 'scatter',
     normalization: str = 'per_direction',
     ax = None,
-    figsize: tuple = None
+    figsize: tuple = None, 
+    cmap: str = 'seismic'
 ):
     """
     Plot phonon angular momentum (PAM) projection on band structure using pre-calculated data.
@@ -295,17 +296,14 @@ def plot_pam_bands_from_data(
     else:
         fig = ax.figure
     
-    # Define colormap
-    cmap_list = ["PiYG", "PuOr", "seismic"]
-    
     # Set up normalization
-    if normalization == 'per_direction':
+    '''if normalization == 'per_direction':
         norm = mpl.colors.Normalize(vmin=Jxyz[comp, :, :].min(), vmax=Jxyz[comp, :, :].max())
     else:
-        norm = mpl.colors.Normalize(vmin=Jxyz.min(), vmax=Jxyz.max())
-    
+        norm = mpl.colors.Normalize(vmin=Jxyz.min(), vmax=Jxyz.max())'''
+    norm = mpl.colors.Normalize(vmin=-1, vmax=1)
     # Create scalar mappable for colorbar
-    s_m = mpl.cm.ScalarMappable(cmap=cmap_list[comp], norm=norm)
+    s_m = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
     s_m.set_array([])
     
     # Plot each band
@@ -340,7 +338,7 @@ def plot_pam_bands_from_data(
             ax.scatter(distances, frequencies[:, band],
                        s=np.abs(Jxyz[comp, :, band]) * 20,
                        c=Jxyz[comp, :, band],
-                       cmap=cmap_list[comp],
+                       cmap=cmap,
                        norm=norm)
     
     # Add vertical lines at segment boundaries
@@ -374,7 +372,8 @@ def plot_pam_data(distances: np.ndarray,
                  layout: str = 'v',
                  figsize=None,
                  ax = None,
-                 band_index: int = None):
+                 band_index: int = None,
+                 cmap: str = 'seismic'):
     """
     Plot phonon angular momentum (PAM) along the phonon dispersion.
 
@@ -427,21 +426,21 @@ def plot_pam_data(distances: np.ndarray,
         axes = [axes]
     else:
         axes = list(axes)
-
-    cmap_list = ["PiYG", "PuOr", "seismic"]
+    '''
     if normalization == 'per_direction':
         norm_all = {comp: mpl.colors.Normalize(vmin=Jxyz[comp, :, :].min(), vmax=Jxyz[comp, :, :].max())
                     for comp in range(3)}
     else:
-        overall_norm = mpl.colors.Normalize(vmin=Jxyz.min(), vmax=Jxyz.max())
-
+        overall_norm = mpl.colors.Normalize(vmin=Jxyz.min(), vmax=Jxyz.max())'''
+    norm = mpl.colors.Normalize(vmin=-1, vmax=1)
     bands_to_plot = [band_index] if band_index is not None else range(frequencies.shape[1])
     for i, ax in enumerate(axes):
         comp = i if direction == 'a' else 'xyz'.index(direction)
         
         # Set up scalarmappable for colorbar
-        norm_val = norm_all[comp] if normalization == 'per_direction' else overall_norm
-        s_m = mpl.cm.ScalarMappable(cmap=cmap_list[comp], norm=norm_val)
+        #norm_val = norm_all[comp] if normalization == 'per_direction' else overall_norm
+        norm_val = norm
+        s_m = mpl.cm.ScalarMappable(cmap=cmap, norm=norm_val)
         s_m.set_array([Jxyz[comp]])
         
         # Always plot gray lines for each band segment
@@ -475,7 +474,7 @@ def plot_pam_data(distances: np.ndarray,
                 sc = ax.scatter(distances, frequencies[:, band],
                                 s=np.abs(Jxyz[comp, :, band]) * 20,
                                 c=Jxyz[comp, :, band],
-                                cmap=cmap_list[comp],
+                                cmap=cmap,
                                 norm=norm_val)
         
         # Add vertical lines at segment boundaries

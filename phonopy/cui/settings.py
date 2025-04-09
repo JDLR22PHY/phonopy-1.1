@@ -1215,6 +1215,7 @@ class PhonopySettings(Settings):
         "pamdos": False,
         "pam_bands": False,
         "pam_temperature": 0,
+        "pam_cmap": 'seismic',
         "int_pamdos": False,
         "with_pam_bands": False,
         "fc_spg_symmetry": False,
@@ -1342,8 +1343,12 @@ class PhonopySettings(Settings):
         """Set temperature for pam."""
         self._v["pam_temperature"] = val
     
+    def set_pam_cmap(self, val):
+        """Set cmap for pam."""
+        self._v["pam_cmap"] = val
+    
     def set_int_pamdos(self, val):
-        """Set temperature for pam."""
+        """Set integration for pamdos."""
         self._v["int_pamdos"] = val
 
     def set_with_pam_bands(self, val):
@@ -1613,6 +1618,9 @@ class PhonopyConfParser(ConfParser):
 
         if "pam_temperature" in arg_list:
             self._confs["pam_temperature"] = self._args.pam_temperature if self._args.pam_temperature else 0
+        
+        if "pam_cmap" in arg_list:
+            self._confs["pam_cmap"] = self._args.pam_cmap if self._args.pam_cmap else 'seismic'
 
         if "int_ldos" in arg_list:
             self._confs["int_ldos"] = ".true." if self._args.int_ldos else ".false."
@@ -2041,6 +2049,12 @@ class PhonopyConfParser(ConfParser):
                     self.set_parameter("pam_temperature", confs["pam_temperature"])
                 else:
                     self.set_parameter("pam_temperature", 0)
+            
+            if conf_key == "pam_cmap":
+                if confs["pam_cmap"] != '':
+                    self.set_parameter("pam_cmap", confs["pam_cmap"])
+                else:
+                    self.set_parameter("pam_cmap", 'seismic')
 
             if conf_key == "int_ldos":
                 if confs["int_ldos"].lower() == ".true.":
@@ -2404,6 +2418,9 @@ class PhonopyConfParser(ConfParser):
 
         if "pam_temperature" in params:
             self._settings.set_pam_temperature(params["pam_temperature"])
+        
+        if "pam_cmap" in params:
+            self._settings.set_pam_cmap(params["pam_cmap"])
 
         if "fits_debye_model" in params:
             self._settings.set_fits_Debye_model(params["fits_debye_model"])

@@ -1369,7 +1369,7 @@ def _run_calculation(phonon: Phonopy, settings, plot_conf, log_level):
                     print("Debye frequency: %10.5f" % debye_freq)
             phonon.write_pam_dos()
             if settings.with_pam_bands:
-                plot=phonon.plot_band_structure_and_pam_dos(temperature=settings.pam_temperature)              
+                plot=phonon.plot_band_structure_and_pam_dos(temperature=settings.pam_temperature, pam_cmap=settings.pam_cmap)              
             if plot_conf["plot_graph"] and not settings.with_pam_bands:
                 plot = phonon.plot_pam_dos()
             if plot_conf["save_graph"]:
@@ -1483,7 +1483,7 @@ def _run_calculation(phonon: Phonopy, settings, plot_conf, log_level):
         ):
             if settings.pdos_indices is not None:
                 _pdos_indices, legend = _get_pdos_indices_and_legend(settings, phonon)
-                plot = phonon.plot_band_structure_and_dos(pdos_indices=_pdos_indices)
+                plot = phonon.plot_band_structure_and_dos(pdos_indices=_pdos_indices, pam_cmap=settings.pam_cmap)
             else:
                 plot = phonon.plot_band_structure_and_dos()
             if plot_conf["save_graph"]:
@@ -1523,7 +1523,8 @@ def _run_calculation(phonon: Phonopy, settings, plot_conf, log_level):
                  frequencies=frequencies,
                  Jxyz=Jxyz,
                  segment_nqpoint=segment_nqpoint,
-                 labels=labels)
+                 labels=labels,
+                 pam_cmap=settings.pam_cmap)
             
             if plot_conf["save_graph"]:
                 plot.savefig(figname)
