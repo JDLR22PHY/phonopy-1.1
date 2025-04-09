@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased] - 2025-04-09
+
+### Added
+- New script `plot_phonon_dispersion_color.py` in Postprocessing_scripts for colored phonon dispersion plotting
+- Command line argument `--pam-cmap` to specify custom colormap for PAM bands plotting
+- Command line argument `--with-pam-bands` to plot PAMDOS alongside PAM projected phonon dispersion
+- Fixed colorbar range for PAM bands plot to [-1, 1]
+
 ## [2.28.1] - 2024-03-25
 
 ### Added

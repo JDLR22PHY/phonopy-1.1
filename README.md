@@ -19,6 +19,9 @@ This version incorporates capabilities to compute the phonon angular momentum (P
 - **Band Structure PAM:**  
   New capability to calculate PAM along band structure paths using the `--pam-bands` option. This requires a pre-existing `band.yaml` file.
 
+- **Colored Phonon Dispersion Plotting:**  
+  A new script `plot_phonon_dispersion_color.py` has been added to the Postprocessing_scripts directory. This script allows for visualization of phonon dispersion with PAM projections. See the script's README for detailed usage instructions.
+
 ## Installation
 
 You can compile Phonopy from the source code as explained in the [official installation instructions](https://phonopy.github.io/phonopy/install.html#installation-from-source-code).
@@ -83,6 +86,10 @@ phonopy-load --pam-bands -p -s
 - `-s`  
   Instructs Phonopy to save the plotted graph. This is recommended for better graph proportions.
 
+- `--pam-cmap`: Specify a custom colormap for PAM bands plotting (e.g., 'viridis', 'plasma', 'inferno')
+
+- `--with-pam-bands`: When used with PAMDOS calculation, plots the PAMDOS alongside the PAM projected phonon dispersion. Note that the frequency range is automatically scaled to match the PAMDOS range.
+
 ## Example Workflow
 
 1. **Standard PAM DOS Calculation:**  
@@ -96,7 +103,18 @@ phonopy-load --pam-bands -p -s
    - Compute and integrate the PAM-resolved DOS.
    - Plot and save the PAM DOS.
 
-2. **Band Structure PAM Calculation:**  
+2. **PAM DOS with Custom Colormap and Bands:**  
+   To calculate PAM DOS with a custom colormap and display the bands:
+   ```bash
+   phonopy-load --mesh 31 31 31 -p --pamdos --pam-cmap viridis --with-pam-bands -s
+   ```
+   This will:
+   - Calculate the PAM DOS as before
+   - Use the 'viridis' colormap for visualization
+   - Display the PAM projected phonon dispersion alongside the DOS
+   - Save the plot with proper proportions
+
+3. **Band Structure PAM Calculation:**  
    To calculate PAM along band structure paths:
    ```bash
    phonopy-load --pam-bands -p -s
@@ -106,7 +124,7 @@ phonopy-load --pam-bands -p -s
    - Calculate PAM along the band structure paths
    - Plot and save the results
 
-3. **PAM DOS Integration:**  
+4. **PAM DOS Integration:**  
    To integrate the PAM-resolved DOS and calculate the difference between positive and negative states:
    ```bash
    phonopy-load --mesh 61 61 61 --pamdos --int-pamdos --fmin 0 --fmax 10
