@@ -80,7 +80,7 @@ def phonon_angular_momentum(freq: np.ndarray,
         e1 = E[:, :, :, ixyz[ii][0]]  # e_y or e_z for Jx, etc.
         e2 = E[:, :, :, ixyz[ii][1]]  # e_z or e_x for Jx, etc.
         # 2 * sum_over_atoms(Im(e1 * conj(e2)))
-        Jxyz[ii] = 2.0 * np.sum(e[:, :, :, 0].conj() * e[:, :, :, 1] - e[:, :, :, 0] * e[:, :, :, 1].conj(), axis=2).imag 
+        Jxyz[ii] = 2.0 * np.sum(e1[:, :, :, 0].conj() * e2[:, :, :, 1] - e1[:, :, :, 0] * e2[:, :, :, 1].conj(), axis=2).imag 
 
     return Jxyz * nbose  # shape=(3, nqpts, nbnds)
 
