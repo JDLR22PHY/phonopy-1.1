@@ -767,7 +767,7 @@ class PAMDos(Dos):
     """Class to calculate phonon DOS separated by positive and negative PAM for each axis."""
 
     def __init__(
-        self, mesh_object: Mesh, sigma=None, use_tetrahedron_method=False, temperature=0.0, threshold=0.000001, 
+        self, mesh_object: Mesh, sigma=None, use_tetrahedron_method=False, temperature=0.0, threshold=1.0, 
         freq_min=None,
         freq_max=None,
     ):
