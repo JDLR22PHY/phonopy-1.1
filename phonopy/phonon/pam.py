@@ -356,7 +356,7 @@ def plot_pam_bands_from_data(
     if labels:
         ax.set_xticklabels(labels)
     
-    ax.set_ylabel('Frequency (THz)')
+    ax.set_ylabel('Frequency (cm⁻1)')
     ax.set_title(f'J{direction} Band Structure')
     
     return fig, ax, s_m
@@ -493,7 +493,7 @@ def plot_pam_data(distances: np.ndarray,
         if labels:
             ax.set_xticklabels(labels)
         
-        ax.set_ylabel('Frequency (THz)')
+        ax.set_ylabel('Frequency (cm⁻1)')
         
         # Add colorbar
         divider = make_axes_locatable(ax)
