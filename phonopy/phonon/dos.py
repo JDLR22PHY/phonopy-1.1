@@ -776,6 +776,7 @@ class PAMDos(Dos):
             mesh_object, sigma=sigma, use_tetrahedron_method=use_tetrahedron_method
         )
         self.temperature = temperature
+        self._frequencies = mesh_object.frequencies
         self.threshold = threshold
         self.Jxyz = None  # To store PAM
         self.dos_positive = None  # shape (3, frequency_points)
