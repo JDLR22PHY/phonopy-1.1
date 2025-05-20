@@ -891,7 +891,8 @@ class PAMDos(Dos):
             positive_freqs = self._frequencies[positive_mask]  # shape=(num_positive,)
             positive_j = self.Jxyz[axis][positive_mask]
             # Multiply the original weight by |PAM|
-            positive_weights = broadcast_weights[positive_mask] * np.abs(positive_j)
+            #* np.abs(positive_j)
+            positive_weights = broadcast_weights[positive_mask]
             self.dos_positive[axis] = self._calculate_dos(
                 positive_freqs, positive_weights
             )
