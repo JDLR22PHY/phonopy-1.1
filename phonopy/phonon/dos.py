@@ -889,9 +889,8 @@ class PAMDos(Dos):
             # Positive PAM
             positive_mask = self.Jxyz[axis] > self.threshold  # shape=(nqpts, nbnds)
             positive_freqs = self._frequencies[positive_mask]  # shape=(num_positive,)
-            positive_j = self.Jxyz[axis][positive_mask]
-            # Multiply the original weight by |PAM|
-            positive_weights = broadcast_weights[positive_mask] * np.abs(positive_j)
+            # Multiply the original weight by 1.0 (state counting)
+            positive_weights = broadcast_weights[positive_mask] * 1.0
             self.dos_positive[axis] = self._calculate_dos(
                 positive_freqs, positive_weights
             )
@@ -899,8 +898,7 @@ class PAMDos(Dos):
             # Negative PAM
             negative_mask = self.Jxyz[axis] < -self.threshold  # shape=(nqpts, nbnds)
             negative_freqs = self._frequencies[negative_mask]  # shape=(num_negative,)
-            negative_j = self.Jxyz[axis][negative_mask]
-            negative_weights = broadcast_weights[negative_mask] * np.abs(negative_j)
+            negative_weights = broadcast_weights[negative_mask] * 1.0
             self.dos_negative[axis] = self._calculate_dos(
                 negative_freqs, negative_weights
             )
@@ -927,13 +925,13 @@ class PAMDos(Dos):
         for axis in range(num_axes):
             # Positive PAM
             positive_coef = np.where(self.Jxyz[axis] > self.threshold,
-                           np.abs(self.Jxyz[axis]),
-                           0)
+                           1.0,
+                           0.0)
             coef_positive = positive_coef.reshape(num_grid_points, 1, num_bands)
             # Negative PAM
             negative_coef = np.where(self.Jxyz[axis] < -self.threshold,
-                           np.abs(self.Jxyz[axis]),
-                           0)
+                           1.0,
+                           0.0)
             coef_negative = negative_coef.reshape(num_grid_points, 1, num_bands)
             # Calculate DOS for positive PAM modes
             dos_pos = run_tetrahedron_method_dos(
