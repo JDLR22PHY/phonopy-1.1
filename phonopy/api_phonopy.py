@@ -2311,7 +2311,8 @@ class Phonopy:
         freq_pitch=None,
         use_tetrahedron_method=True,
         temperature=0,
-        int_pamdos=False
+        int_pamdos=False,
+        threshold=1e-5
     ) -> None:
         """Calculate the phonon angular momentum–resolved DOS.
         
@@ -2329,7 +2330,7 @@ class Phonopy:
             raise RuntimeError(msg)
 
         pam_dos = PAMDos(
-            self._mesh, sigma=sigma, use_tetrahedron_method=use_tetrahedron_method, temperature=temperature, freq_min=freq_min, freq_max=freq_max,
+            self._mesh, sigma=sigma, use_tetrahedron_method=use_tetrahedron_method, temperature=temperature, threshold=threshold, freq_min=freq_min, freq_max=freq_max,
         )
         pam_dos.set_draw_area(freq_min, freq_max, freq_pitch)
         pam_dos.run(int_pamdos)
